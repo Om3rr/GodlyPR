@@ -41,7 +41,7 @@ class JiraGodClient:
 
 if __name__ == '__main__':
     if(len(sys.argv) == 1):
-        print("Should run python api.py DEV-1234")
+        print("Should run python api.py DEV-1234 branch(optional)")
     try:
         to_branch = sys.argv[2]
     except:
