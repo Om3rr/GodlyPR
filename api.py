@@ -1,7 +1,10 @@
 import requests
+import shlex
+import subprocess
 import os
 import sys
 import json
+import re
 class JiraGodClient:
     def __init__(self):
         self.token = os.environ['JIRA_TOKEN']
@@ -25,6 +28,10 @@ class JiraGodClient:
 
 
     def transit_issue(self, error_id):
+        # uri = os.path.join(base_uri, issue_id, 'assignee')
+        #         payload = {"accountId": assign_to}
+        #         return sess.request("PUT", url=uri, data=json.dumps(payload))
+        r = self.client.request("PUT", self.issue_api(error_id) + "/assignee", data=json.dumps({"accountId": "5b33d3737b8c14625a47f1aa"}))
         r = self.client.request("POST", self.issue_api(error_id) + "/transitions",
                                 data=json.dumps({"transition": { "id": '4'}}))
         r = self.client.request("POST", self.issue_api(error_id) + "/transitions",
@@ -32,19 +39,23 @@ class JiraGodClient:
 
 
 
-    def create_pull_request(self, error_id, to_branch):
-        title = self.describe_error(error_id)
+    def create_pull_request(self, error_id=None, to_branch=None):
+        m = re.search(r"(DEV-\d+)", error_id)
+        ticket_id = m.group(1)
+        title = self.describe_error(ticket_id)
+        self.transit_issue(ticket_id)
         print("hub pull-request -b {0} -h {1} -m '{2}'".format(to_branch, error_id, title))
-        print(os.system("hub pull-request -b {0} -h {1} -m \"{2}\"".format(to_branch, error_id, title)))
-        self.transit_issue(error_id)
+        print(os.system("hub pull-request -b {0} -h {1} -l \"Ready for Review\" -m \"{2}\"".format(to_branch, error_id, title)))
 
 
 if __name__ == '__main__':
-    if(len(sys.argv) == 1):
-        print("Should run python api.py DEV-1234 branch(optional)")
     try:
+        from_branch = sys.argv[1]
+        if from_branch == "this":
+            from_branch = subprocess.check_output(shlex.split("git rev-parse --abbrev-ref HEAD")).strip().decode('utf-8')
         to_branch = sys.argv[2]
     except:
-        to_branch = "v2.3"
+        from_branch = subprocess.check_output(shlex.split("git rev-parse --abbrev-ref HEAD")).strip().decode('utf-8')
+        to_branch = "staging"
     # print
-    JiraGodClient().create_pull_request(sys.argv[1], to_branch)
+    JiraGodClient().create_pull_request(from_branch, to_branch)
